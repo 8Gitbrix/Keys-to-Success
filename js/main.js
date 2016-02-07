@@ -2,10 +2,11 @@ $(function() {
     var places = $('.places');
     var counter = 2;
 
-    var map = marker = infoWindow = null;
+    var geocoder = map = marker = infoWindow = null;
     var defaultCenter = [40.151127, -74.6521];
     var userCenter = [];
     var markers = [];
+    var weights = [];
 
     $('.another-one').on('click', function(e) {
         e.preventDefault();
@@ -39,9 +40,7 @@ $(function() {
         }
     }
 
-    function addMarker(placeName) {
-        var lat = lng = 0;
-
+    function addMarker(placeName, lat, lng) {
         marker = new google.maps.Marker({
             map: map,
             position: new google.maps.LatLng(lat, lng),
@@ -60,26 +59,65 @@ $(function() {
         })(marker));
     }
 
-    function codeAddress(address) 
-    {
-    geocoder.geocode( {address:address}, function(results, status) {
-    if (status == google.maps.GeocoderStatus.OK) 
-    {
-        map.setCenter(results[0].geometry.location);//center the map over the result
-        //place a marker at the location
-        var marker = new google.maps.Marker(
-        {
-            map: map,
-            position: results[0].geometry.location
-        })
-        markers.push(marker);
+    function codeAddress(address) {
+        geocoder.geocode({
+            address: address
+        }, function(results, status) {
+            if (status === google.maps.GeocoderStatus.OK) {
+                map.setCenter(results[0].geometry.location);
+                addMarker(results[0].formatted_address, results[0].geometry.location.lat(), results[0].geometry.location.lng());
+            } else {
+                alert('Geocode was not successful for the following reason: ' + status);
+            }
+        });
+}
 
-    } else 
+
+    function getWeightBw(o, d) {
+        var oLat = o.position.lat();
+        var oLng = o.position.lng();
+
+        var dLat = d.position.lat();
+        var dLng = d.position.lng();
+
+        var origin = new google.maps.LatLng(oLat, oLng);
+        var destination = new google.maps.LatLng(dLat, dLng);
+
+        var service = new google.maps.DistanceMatrixService();
+        service.getDistanceMatrix({
+            origins: [origin],
+            destinations: [destination],
+            travelMode: google.maps.TravelMode.DRIVING
+        }, function(response, status) {
+            if (status == google.maps.DistanceMatrixStatus.OK) {
+                var origins = response.originAddresses;
+                var destinations = response.destinationAddresses;
+
+                for (var i = 0; i < origins.length; i++) {
+                    var results = response.rows[i].elements;
+                    for (var j = 0; j < results.length; j++) {
+                        var element = results[j];
+                        var distance = element.distance.text;
+                        var duration = element.duration.text;
+                        var from = origins[i];
+                        var to = destinations[j];
+                        console.log('It takes ' + duration + ' long to get from ' + from + ' to ' + to + '!');
+                    }
+                }
+            }
+        });
+    }
+
+    function getWeights(markers)
     {
-        alert('Geocode was not successful for the following reason: ' + status);
+        getWeightBw(markers[0], markers[1]);
     }
-    });
+
+    function findMST(graph)
+    {
+
     }
+
 
     function initialize(arr) {
 
@@ -103,7 +141,8 @@ $(function() {
             geocoder = new google.maps.Geocoder();
             codeAddress(arr[i]);
         }
+        google.maps.event.addListenerOnce(map, 'tilesloaded', function() {
+            getWeights(markers);
+        });
     }
-
-
 });
